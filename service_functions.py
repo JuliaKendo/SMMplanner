@@ -31,6 +31,8 @@ def extracturl(hyperlink):
 
 def get_file_id(hyperlink):
     url = extracturl(hyperlink)
+    if not url:
+        return None
     url_info = urlparse(url)
     for param in url_info.query.split('&'):
         if 'id' in param:

@@ -85,29 +85,32 @@ def save_into_spreadsheet(spreadsheet_id, range):
                           body=body).execute()
 
 
-def publish_posts(article_file, image_file, vk, telegram, fb):
+def publish_posts(article, image, vk, telegram, fb):
     num_of_publications = 0
+    article_file = download_article(article)
+    if not article_file:
+        raise ValueError('Ошибка загрузки статьи!')
+    image_file = download_image(image)
+    saved_files = [article_file, image_file]
     message = service_functions.get_message(article_file)
-    if OK in vk:
-        if publications.post_on_social_media(publications.post_vkontakte, message, [image_file],
-                                             token=os.getenv('VK_ACCESS_TOKEN'),
-                                             id=int(os.getenv('VK_GROUP_ID')),
-                                             album_id=int(os.getenv('VK_ALBUM_ID')),
-                                             title='vc'):
-            num_of_publications += 1
-    if OK in telegram:
-        if publications.post_on_social_media(publications.post_telegram, message, [image_file],
-                                             token=os.getenv('TELEGRAM_ACCESS_TOKEN'),
-                                             id=os.getenv('TELEGRAM_CHAT_ID'),
-                                             title='telegram'):
-            num_of_publications += 1
-    if OK in fb:
-        if publications.post_on_social_media(publications.post_facebook, message, [image_file],
-                                             token=os.getenv('FACEBOOK_ACCESS_TOKEN'),
-                                             id=os.getenv('FACEBOOK_GROUP_ID'),
-                                             title='facebook'):
-            num_of_publications += 1
+    if OK in vk and publications.post_on_social_media(publications.post_vkontakte, message, [image_file],
+                                                      token=os.getenv('VK_ACCESS_TOKEN'),
+                                                      id=int(os.getenv('VK_GROUP_ID')),
+                                                      album_id=int(os.getenv('VK_ALBUM_ID')),
+                                                      title='vc'):
+        num_of_publications += 1
+    if OK in telegram and publications.post_on_social_media(publications.post_telegram, message, [image_file],
+                                                            token=os.getenv('TELEGRAM_ACCESS_TOKEN'),
+                                                            id=os.getenv('TELEGRAM_CHAT_ID'),
+                                                            title='telegram'):
+        num_of_publications += 1
+    if OK in fb and publications.post_on_social_media(publications.post_facebook, message, [image_file],
+                                                      token=os.getenv('FACEBOOK_ACCESS_TOKEN'),
+                                                      id=os.getenv('FACEBOOK_GROUP_ID'),
+                                                      title='facebook'):
+        num_of_publications += 1
 
+    [os.remove(saved_file) for saved_file in saved_files if saved_file]
     return num_of_publications > 0
 
 
@@ -131,7 +134,7 @@ def is_publish(weekday, publish_time, published):
     elif today.weekday() == 6 and 'воскресенье' not in weekday:
         return False
 
-    if str(publish_time) != today.strftime("%H"):
+    if publish_time != int(today.strftime("%H")):
         return False
 
     return True
@@ -171,32 +174,26 @@ def main():
     while True:
         try:
             spreadsheet_data = read_spreadsheet(spreadsheet_id, range)
-            saved_files = ()
             for num, row in enumerate(spreadsheet_data):
-                vk, telegram, fb, weekday, publish_time, article, image, published = row
-                if not is_publish(weekday, publish_time, published):
+                try:
+                    vk, telegram, fb, weekday, publish_time, article, image, published = row
+                    if not is_publish(weekday, publish_time, published):
+                        continue
+                    if publish_posts(article, image, vk, telegram, fb):
+                        save_into_spreadsheet(spreadsheet_id, f'H{num+header_height}')
+
+                except (KeyError, TypeError) as error:
+                    logger.error(f'{error}', exc_info=True)
                     continue
-                article_file = download_article(article)
-                image_file = download_image(image)
-                saved_files += (article_file, image_file)
-                if publish_posts(article_file, image_file, vk, telegram, fb):
-                    save_into_spreadsheet(spreadsheet_id, f'H{num+header_height}')
+
+                except ValueError as error:
+                    logger.error(f'{error}', exc_info=True)
+                    continue
 
         except ApiRequestError as error:
-            logger.error(f'{error}')
-
-        except (KeyError, TypeError) as error:
-            logger.error(f'{error}')
-
-        except ValueError as error:
-            logger.error(f'{error}')
-
-        else:
-            logger.info('Публикация выполнена успешно!') if saved_files else None
+            logger.error(f'{error}', exc_info=True)
 
         finally:
-            for saved_file in saved_files:
-                os.remove(saved_file)
             time.sleep(int(args.sleep))
 
 

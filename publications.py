@@ -79,27 +79,27 @@ def post_on_social_media(posting_function, message, images, **kwargs):
             posting_function(kwargs['token'], kwargs['id'], message, images)
 
     except (vk_api.VkApiError, vk_api.ApiHttpError, vk_api.AuthError) as error:
-        logger.error('Ошибка публикации поста на сайт вконтакте: {0}'.format(error))
+        logger.error('Ошибка публикации поста на сайт вконтакте: {0}'.format(error), exc_info=True)
         return False
 
     except telegram.TelegramError as error:
-        logger.error('Ошибка публикации поста в телеграмме: {0}'.format(error))
+        logger.error('Ошибка публикации поста в телеграмме: {0}'.format(error), exc_info=True)
         return False
 
     except requests.exceptions.HTTPError as error:
-        logger.error('Ошибка загрузки данных на сайт: {0}'.format(error))
+        logger.error('Ошибка загрузки данных на сайт: {0}'.format(error), exc_info=True)
         return False
 
     except (KeyError, TypeError) as error:
-        logger.error('Ошибка загрузки или публикации поста: {0}'.format(error))
+        logger.error('Ошибка загрузки или публикации поста: {0}'.format(error), exc_info=True)
         return False
 
     except ValueError as error:
-        logger.error(f'{error}')
+        logger.error(f'{error}', exc_info=True)
         return False
 
     except OSError as error:
-        logger.error('Ошибка чтения файлов с содержимым поста: {0}'.format(error))
+        logger.error('Ошибка чтения файлов с содержимым поста: {0}'.format(error), exc_info=True)
         return False
 
     else:
