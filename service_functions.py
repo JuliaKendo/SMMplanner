@@ -1,3 +1,4 @@
+import os
 import requests
 import re
 import string
@@ -42,3 +43,9 @@ def get_file_id(hyperlink):
 def get_header_height(range):
     num_row = re.findall(r'(\d{0,9}):+', range)
     return int(num_row[0]) if num_row else 0
+
+
+def remove_files(files):
+    for file in files:
+        if file:
+            os.remove(file)

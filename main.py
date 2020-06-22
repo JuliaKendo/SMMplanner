@@ -18,6 +18,7 @@ import publications
 
 OK = 'да'
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+WEEKDAYS = {0: 'понедельник', 1: 'вторник', 2: 'среда', 3: 'четверг', 4: 'пятница', 5: 'суббота', 6: 'воскресенье'}
 logger = logging.getLogger('smmplaner')
 
 
@@ -86,32 +87,30 @@ def save_into_spreadsheet(spreadsheet_id, range):
 
 
 def publish_posts(article, image, vk, telegram, fb):
-    num_of_publications = 0
+    published = False
     article_file = download_article(article)
     if not article_file:
         raise ValueError('Ошибка загрузки статьи!')
     image_file = download_image(image)
-    saved_files = [article_file, image_file]
     message = service_functions.get_message(article_file)
     if OK in vk and publications.post_on_social_media(publications.post_vkontakte, message, [image_file],
                                                       token=os.getenv('VK_ACCESS_TOKEN'),
                                                       id=int(os.getenv('VK_GROUP_ID')),
                                                       album_id=int(os.getenv('VK_ALBUM_ID')),
                                                       title='vc'):
-        num_of_publications += 1
+        published = True
     if OK in telegram and publications.post_on_social_media(publications.post_telegram, message, [image_file],
                                                             token=os.getenv('TELEGRAM_ACCESS_TOKEN'),
                                                             id=os.getenv('TELEGRAM_CHAT_ID'),
                                                             title='telegram'):
-        num_of_publications += 1
+        published = True
     if OK in fb and publications.post_on_social_media(publications.post_facebook, message, [image_file],
                                                       token=os.getenv('FACEBOOK_ACCESS_TOKEN'),
                                                       id=os.getenv('FACEBOOK_GROUP_ID'),
                                                       title='facebook'):
-        num_of_publications += 1
-
-    [os.remove(saved_file) for saved_file in saved_files if saved_file]
-    return num_of_publications > 0
+        published = True
+    service_functions.remove_files([article_file, image_file])
+    return published
 
 
 def is_publish(weekday, publish_time, published):
@@ -119,19 +118,7 @@ def is_publish(weekday, publish_time, published):
     if OK in published:
         return False
 
-    if today.weekday() == 0 and 'понедельник' not in weekday:
-        return False
-    elif today.weekday() == 1 and 'вторник' not in weekday:
-        return False
-    elif today.weekday() == 2 and 'среда' not in weekday:
-        return False
-    elif today.weekday() == 3 and 'четверг' not in weekday:
-        return False
-    elif today.weekday() == 4 and 'пятница' not in weekday:
-        return False
-    elif today.weekday() == 5 and 'суббота' not in weekday:
-        return False
-    elif today.weekday() == 6 and 'воскресенье' not in weekday:
+    if WEEKDAYS[today.weekday()] not in weekday:
         return False
 
     if publish_time != int(today.strftime("%H")):
@@ -169,7 +156,7 @@ def main():
 
     spreadsheet_id = os.getenv('SPREADSHEET_ID')
     range = os.getenv('RANGE_NAME')
-    header_height = service_functions.get_header_height(range)
+    table_header_height = service_functions.get_header_height(range)
 
     while True:
         try:
@@ -180,7 +167,7 @@ def main():
                     if not is_publish(weekday, publish_time, published):
                         continue
                     if publish_posts(article, image, vk, telegram, fb):
-                        save_into_spreadsheet(spreadsheet_id, f'H{num+header_height}')
+                        save_into_spreadsheet(spreadsheet_id, f'H{num+table_header_height}')
 
                 except (KeyError, TypeError) as error:
                     logger.error(f'{error}', exc_info=True)
