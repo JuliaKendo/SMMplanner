@@ -34,7 +34,7 @@ python.exe main.py -s 300 -l logs
 
 Так же в корневую папку скрипта необходимо положить следующие файлы:
 1. `credentials.json` - файл с параметрами авторизации [Google Sheets API](https://developers.google.com/sheets/api/quickstart/python).
-2. `credentials.json` - файл с информацией о аутентификации вашего приложения [Google Drive](https://gsuitedevs.github.io/PyDrive/docs/build/html/quickstart.html#authentication)
+2. `client_secrets.json` - файл с информацией о аутентификации вашего приложения [Google Drive](https://gsuitedevs.github.io/PyDrive/docs/build/html/quickstart.html#authentication)
 
 Python3 должен быть уже установлен. Затем используйте pip (или pip3, если есть конфликт с Python2) для установки зависимостей:
 
