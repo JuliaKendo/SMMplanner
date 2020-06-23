@@ -5,6 +5,8 @@ import argparse
 import pickle
 import time
 import datetime
+import requests
+import vk_api
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -12,6 +14,7 @@ from google.auth.transport.requests import Request
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 from pydrive.files import ApiRequestError
+from telegram import TelegramError
 import service_functions
 import publications
 
@@ -86,31 +89,29 @@ def save_into_spreadsheet(spreadsheet_id, range):
                           body=body).execute()
 
 
-def publish_posts(article, image, vk, telegram, fb):
-    published = False
+def publish_posts(article, image, vk, tg, fb):
     article_file = download_article(article)
     if not article_file:
         raise ValueError('Ошибка загрузки статьи!')
     image_file = download_image(image)
     message = service_functions.get_message(article_file)
-    if OK in vk and publications.post_on_social_media(publications.post_vkontakte, message, [image_file],
-                                                      token=os.getenv('VK_ACCESS_TOKEN'),
-                                                      id=int(os.getenv('VK_GROUP_ID')),
-                                                      album_id=int(os.getenv('VK_ALBUM_ID')),
-                                                      title='vc'):
-        published = True
-    if OK in telegram and publications.post_on_social_media(publications.post_telegram, message, [image_file],
-                                                            token=os.getenv('TELEGRAM_ACCESS_TOKEN'),
-                                                            id=os.getenv('TELEGRAM_CHAT_ID'),
-                                                            title='telegram'):
-        published = True
-    if OK in fb and publications.post_on_social_media(publications.post_facebook, message, [image_file],
-                                                      token=os.getenv('FACEBOOK_ACCESS_TOKEN'),
-                                                      id=os.getenv('FACEBOOK_GROUP_ID'),
-                                                      title='facebook'):
-        published = True
+    if OK in vk:
+        publications.post_vkontakte(os.getenv('VK_ACCESS_TOKEN'),
+                                    int(os.getenv('VK_GROUP_ID')),
+                                    int(os.getenv('VK_ALBUM_ID')),
+                                    message, [image_file])
+
+    if OK in tg:
+        publications.post_telegram(os.getenv('TELEGRAM_ACCESS_TOKEN'),
+                                   os.getenv('TELEGRAM_CHAT_ID'),
+                                   message, [image_file])
+
+    if OK in fb:
+        publications.post_facebook(os.getenv('FACEBOOK_ACCESS_TOKEN'),
+                                   os.getenv('FACEBOOK_GROUP_ID'),
+                                   message, [image_file])
+
     service_functions.remove_files([article_file, image_file])
-    return published
 
 
 def is_publish(weekday, publish_time, published):
@@ -129,7 +130,7 @@ def is_publish(weekday, publish_time, published):
 
 def create_parser():
     parser = argparse.ArgumentParser(description='Параметры запуска скрипта')
-    parser.add_argument('-s', '--sleep', default=300, help='Пауза между опросом Google таблицы')
+    parser.add_argument('-s', '--sleep', default=30, help='Пауза между опросом Google таблицы')
     parser.add_argument('-l', '--log', help='Путь к каталогу с log файлом')
     return parser
 
@@ -163,11 +164,23 @@ def main():
             spreadsheet_data = read_spreadsheet(spreadsheet_id, range)
             for num, row in enumerate(spreadsheet_data):
                 try:
-                    vk, telegram, fb, weekday, publish_time, article, image, published = row
+                    vk, tg, fb, weekday, publish_time, article, image, published = row
                     if not is_publish(weekday, publish_time, published):
                         continue
-                    if publish_posts(article, image, vk, telegram, fb):
-                        save_into_spreadsheet(spreadsheet_id, f'H{num+table_header_height}')
+                    publish_posts(article, image, vk, tg, fb)
+                    save_into_spreadsheet(spreadsheet_id, f'H{num+table_header_height}')
+
+                except (vk_api.VkApiError, vk_api.ApiHttpError, vk_api.AuthError) as error:
+                    logger.error('Ошибка публикации поста на сайт вконтакте: {0}'.format(error))
+
+                except TelegramError as error:
+                    logger.error('Ошибка публикации поста в телеграмме: {0}'.format(error))
+
+                except requests.exceptions.HTTPError as error:
+                    logger.error('Ошибка загрузки данных на сайт: {0}'.format(error))
+
+                except OSError as error:
+                    logger.error('Ошибка чтения файлов с содержимым поста: {0}'.format(error))
 
                 except (KeyError, TypeError) as error:
                     logger.error(f'{error}', exc_info=True)
@@ -178,7 +191,7 @@ def main():
                     continue
 
         except ApiRequestError as error:
-            logger.error(f'{error}', exc_info=True)
+            logger.error('Ошибка чтения Google таблицы: {0}'.format(error))
 
         finally:
             time.sleep(int(args.sleep))

@@ -1,6 +1,5 @@
 import os
 import logging
-import requests
 import vk_api
 import telegram
 import service_functions
@@ -69,38 +68,3 @@ def post_facebook(fb_token, fb_group_id, message, images):
     fb_params['attached_media'] = '[%s]' % ','.join(attachments)
 
     service_functions.query_to_site(url, fb_params)
-
-
-def post_on_social_media(posting_function, message, images, **kwargs):
-    try:
-        if 'album_id' in kwargs:
-            posting_function(kwargs['token'], kwargs['id'], kwargs['album_id'], message, images)
-        else:
-            posting_function(kwargs['token'], kwargs['id'], message, images)
-
-    except (vk_api.VkApiError, vk_api.ApiHttpError, vk_api.AuthError) as error:
-        logger.error('Ошибка публикации поста на сайт вконтакте: {0}'.format(error), exc_info=True)
-        return False
-
-    except telegram.TelegramError as error:
-        logger.error('Ошибка публикации поста в телеграмме: {0}'.format(error), exc_info=True)
-        return False
-
-    except requests.exceptions.HTTPError as error:
-        logger.error('Ошибка загрузки данных на сайт: {0}'.format(error), exc_info=True)
-        return False
-
-    except (KeyError, TypeError) as error:
-        logger.error('Ошибка загрузки или публикации поста: {0}'.format(error), exc_info=True)
-        return False
-
-    except ValueError as error:
-        logger.error(f'{error}', exc_info=True)
-        return False
-
-    except OSError as error:
-        logger.error('Ошибка чтения файлов с содержимым поста: {0}'.format(error), exc_info=True)
-        return False
-
-    else:
-        return True
