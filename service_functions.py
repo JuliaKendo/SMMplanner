@@ -2,7 +2,7 @@ import os
 import requests
 import re
 import string
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 
 def get_message(filename):
@@ -24,7 +24,14 @@ def query_to_site(url, params, files=None):
 
 
 def extracturl(hyperlink):
-    urls = re.findall(r'((?:(?:https|ftp|http)?:(?:/{1,3}|[a-z0-9%])|[a-z0-9.\-]+[.](?:com|org|uk)/)[\s\S]*?[";@{};:,<>«»“”‘’])', hyperlink)
+    regex_object = re.compile(r'''((?:
+                                  (?:https|ftp|http)                    #начало веб ссылки
+                                  :(?:/{1,3}|[a-z0-9%])|[a-z0-9.\-]+[.] #тело веб ссылки с ":" до последней точки перед доменной зоной
+                                  (?:com|org|uk)                        #доменная зона
+                                  /)                                    #завершение группы
+                                  [\S]*?[";@{};:,<>«»“”‘’\s]            #любая последовательность кроме пробела, с одним из завершающих веб ссылку символов
+                                  )''', re.VERBOSE)
+    urls = regex_object.findall(hyperlink)
     list_urls = [''.join(x for x in url if x in string.printable and not x == '"') for url in urls]
     if list_urls:
         return list_urls[0]
@@ -35,14 +42,13 @@ def get_file_id(hyperlink):
     if not url:
         return None
     url_info = urlparse(url)
-    for param in url_info.query.split('&'):
-        if 'id' in param:
-            return re.sub(r'(id=)', '', param)
+    params = parse_qs(url_info.query).get('id')
+    return params[0] if params else None
 
 
 def get_header_height(range):
-    num_row = re.findall(r'(\d{0,9}):+', range)
-    return int(num_row[0]) if num_row else 0
+    header_height = re.findall(r'(\d{0,9}):+', range)
+    return int(header_height[0]) if header_height else 0
 
 
 def remove_files(files):
