@@ -14,6 +14,7 @@ from google.auth.transport.requests import Request
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 from telegram import TelegramError
+from pydrive.files import ApiRequestError
 import service_functions
 import publications
 
@@ -189,7 +190,7 @@ def main():
                     logger.exception(f'{error}')
                     continue
 
-        except Exception as error:
+        except ApiRequestError as error:
             logger.exception(f'{error}')
 
         finally:
